@@ -1,18 +1,31 @@
 // Wait for env.js to load and initialize
 function getAgoraAppId() {
     return new Promise((resolve, reject) => {
-        if (typeof window.AGORA_APP_ID !== 'undefined') {
+        // Check immediately
+        if (window.AGORA_APP_ID) {
+            console.log('Agora App ID found immediately');
             resolve(window.AGORA_APP_ID);
-        } else {
-            // Wait for a short time to see if env.js loads
-            setTimeout(() => {
-                if (typeof window.AGORA_APP_ID !== 'undefined') {
-                    resolve(window.AGORA_APP_ID);
-                } else {
-                    reject(new Error('Agora App ID not found. Please check deployment settings.'));
-                }
-            }, 1000);
+            return;
         }
+
+        console.log('Waiting for Agora App ID...');
+        
+        // Try multiple times
+        let attempts = 0;
+        const maxAttempts = 5;
+        const interval = setInterval(() => {
+            attempts++;
+            console.log(`Checking for Agora App ID (attempt ${attempts}/${maxAttempts})...`);
+            
+            if (window.AGORA_APP_ID) {
+                clearInterval(interval);
+                console.log('Agora App ID found after waiting');
+                resolve(window.AGORA_APP_ID);
+            } else if (attempts >= maxAttempts) {
+                clearInterval(interval);
+                reject(new Error('Agora App ID not found after multiple attempts. Please check deployment settings.'));
+            }
+        }, 1000);
     });
 }
 

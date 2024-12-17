@@ -24,26 +24,32 @@ jobs:
       - name: Setup Pages
         uses: actions/configure-pages@v3
 
+      - name: Debug Secrets
+        run: |
+          if [ -n "${{ secrets.AGORA_APP_ID }}" ]; then
+            echo "AGORA_APP_ID is set"
+          else
+            echo "AGORA_APP_ID is not set"
+          fi
+
       - name: Create env.js with App ID
         run: |
-          # Create env.js with strict mode and error checking
-          cat > env.js << 'EOL'
-          'use strict';
-          try {
-            window.AGORA_APP_ID = '${{ secrets.AGORA_APP_ID }}';
-            console.log('Agora App ID loaded successfully');
-          } catch (error) {
-            console.error('Failed to load Agora App ID:', error);
-          }
+          # Create env.js with debugging
+          cat > env.js << EOL
+          console.log('Loading Agora configuration...');
+          window.AGORA_APP_ID = '${{ secrets.AGORA_APP_ID }}';
+          console.log('Agora App ID:', window.AGORA_APP_ID ? 'is set' : 'is not set');
           EOL
-          
-          echo "Content of env.js (masked):"
-          cat env.js | sed 's/window.AGORA_APP_ID = .*/window.AGORA_APP_ID = "***";/'
 
-      - name: List files
+          echo "Content of env.js (masked):"
+          cat env.js | sed 's/AGORA_APP_ID = .*/AGORA_APP_ID = "***";/'
+
+      - name: Verify env.js
         run: |
-          echo "Files to be deployed:"
-          ls -la
+          echo "Checking if env.js exists:"
+          ls -l env.js
+          echo "File size:"
+          wc -c env.js
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v2
