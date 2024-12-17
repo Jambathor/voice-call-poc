@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Voice Call POC</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://download.agora.io/sdk/release/AgoraRTC_N.js"></script>
+</head>
+<body>
+    <div class="container">
+        <h1>Voice Call POC</h1>
+        <div id="join-form">
+            <input type="text" id="username" placeholder="Enter your name" required>
+            <input type="text" id="roomName" placeholder="Enter room name" required>
+            <button id="joinBtn">Join Room</button>
+        </div>
+        
+        <div id="call-controls" style="display: none;">
+            <h2 id="roomDisplay"></h2>
+            <p id="participantName"></p>
+            <button id="leaveBtn">Leave Room</button>
+            <div id="audioStatus">
+                <button id="muteBtn">Mute</button>
+            </div>
+        </div>
+
+        <div id="status-messages"></div>
+    </div>
+    <script src="app.js"></script>
+</body>
+</html> 
