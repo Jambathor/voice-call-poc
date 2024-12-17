@@ -1,5 +1,12 @@
-// Fetch Agora App ID from environment variable
-const appId = process.env.AGORA_APP_ID || window.AGORA_APP_ID;
+// Fetch Agora App ID from window object
+const appId = window.AGORA_APP_ID;
+
+// Add debug logging
+console.log('App initialization:', {
+    appId: appId ? 'defined' : 'undefined',
+    secure: isSecureContext(),
+    url: window.location.href
+});
 
 // Global variables
 let rtcClient = null;

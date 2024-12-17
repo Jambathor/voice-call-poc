@@ -27,6 +27,13 @@ jobs:
       - name: Create env.js with App ID
         run: |
           echo "window.AGORA_APP_ID = '${{ secrets.AGORA_APP_ID }}';" > env.js
+          echo "Verifying env.js content:"
+          cat env.js | sed 's/.*App ID = .*/App ID is set/'
+
+      - name: List files
+        run: |
+          echo "Files to be deployed:"
+          ls -la
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v2
