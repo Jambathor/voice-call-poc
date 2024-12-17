@@ -30,26 +30,34 @@ jobs:
             echo "AGORA_APP_ID is set"
           else
             echo "AGORA_APP_ID is not set"
+            exit 1
           fi
 
       - name: Create env.js with App ID
+        env:
+          AGORA_APP_ID: ${{ secrets.AGORA_APP_ID }}
         run: |
-          # Create env.js with debugging
+          echo "Creating env.js with App ID..."
           cat > env.js << EOL
-          console.log('Loading Agora configuration...');
-          window.AGORA_APP_ID = '${{ secrets.AGORA_APP_ID }}';
-          console.log('Agora App ID:', window.AGORA_APP_ID ? 'is set' : 'is not set');
+          // Agora App ID configuration
+          (function() {
+            console.log('Initializing Agora configuration...');
+            try {
+              window.AGORA_APP_ID = '${AGORA_APP_ID}';
+              if (!window.AGORA_APP_ID) {
+                throw new Error('App ID is empty');
+              }
+              console.log('Agora configuration loaded successfully');
+            } catch (error) {
+              console.error('Failed to initialize Agora configuration:', error);
+            }
+          })();
           EOL
 
-          echo "Content of env.js (masked):"
-          cat env.js | sed 's/AGORA_APP_ID = .*/AGORA_APP_ID = "***";/'
-
-      - name: Verify env.js
-        run: |
-          echo "Checking if env.js exists:"
+          echo "Verifying env.js was created:"
           ls -l env.js
-          echo "File size:"
-          wc -c env.js
+          echo "File contents (masked):"
+          cat env.js | sed 's/AGORA_APP_ID = .*/AGORA_APP_ID = "***";/'
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v2

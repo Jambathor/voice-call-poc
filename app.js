@@ -1,31 +1,44 @@
 // Wait for env.js to load and initialize
 function getAgoraAppId() {
     return new Promise((resolve, reject) => {
-        // Check immediately
-        if (window.AGORA_APP_ID) {
-            console.log('Agora App ID found immediately');
+        const checkAppId = () => {
+            console.log('Checking for Agora App ID...');
+            if (window.AGORA_APP_ID && window.AGORA_APP_ID.length > 0) {
+                console.log('Agora App ID found');
+                return true;
+            }
+            console.log('Agora App ID not found');
+            return false;
+        };
+
+        // First immediate check
+        if (checkAppId()) {
             resolve(window.AGORA_APP_ID);
             return;
         }
 
-        console.log('Waiting for Agora App ID...');
-        
-        // Try multiple times
-        let attempts = 0;
-        const maxAttempts = 5;
-        const interval = setInterval(() => {
-            attempts++;
-            console.log(`Checking for Agora App ID (attempt ${attempts}/${maxAttempts})...`);
-            
-            if (window.AGORA_APP_ID) {
-                clearInterval(interval);
-                console.log('Agora App ID found after waiting');
+        // Set up a mutation observer to watch for script loads
+        const observer = new MutationObserver((mutations) => {
+            if (checkAppId()) {
+                observer.disconnect();
                 resolve(window.AGORA_APP_ID);
-            } else if (attempts >= maxAttempts) {
-                clearInterval(interval);
-                reject(new Error('Agora App ID not found after multiple attempts. Please check deployment settings.'));
             }
-        }, 1000);
+        });
+
+        observer.observe(document.documentElement, {
+            childList: true,
+            subtree: true
+        });
+
+        // Fallback timeout
+        setTimeout(() => {
+            observer.disconnect();
+            if (checkAppId()) {
+                resolve(window.AGORA_APP_ID);
+            } else {
+                reject(new Error('Failed to load Agora App ID. Please check your deployment settings.'));
+            }
+        }, 5000);
     });
 }
 
