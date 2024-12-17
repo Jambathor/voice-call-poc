@@ -26,9 +26,19 @@ jobs:
 
       - name: Create env.js with App ID
         run: |
-          echo "window.AGORA_APP_ID = '${{ secrets.AGORA_APP_ID }}';" > env.js
-          echo "Verifying env.js content:"
-          cat env.js | sed 's/.*App ID = .*/App ID is set/'
+          # Create env.js with strict mode and error checking
+          cat > env.js << 'EOL'
+          'use strict';
+          try {
+            window.AGORA_APP_ID = '${{ secrets.AGORA_APP_ID }}';
+            console.log('Agora App ID loaded successfully');
+          } catch (error) {
+            console.error('Failed to load Agora App ID:', error);
+          }
+          EOL
+          
+          echo "Content of env.js (masked):"
+          cat env.js | sed 's/window.AGORA_APP_ID = .*/window.AGORA_APP_ID = "***";/'
 
       - name: List files
         run: |
@@ -42,4 +52,4 @@ jobs:
 
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v2 
+        uses: actions/deploy-pages@v2

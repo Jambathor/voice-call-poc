@@ -1,14 +1,23 @@
-// Fetch Agora App ID from window object
-const appId = window.AGORA_APP_ID;
-
-// Add debug logging
-console.log('App initialization:', {
-    appId: appId ? 'defined' : 'undefined',
-    secure: isSecureContext(),
-    url: window.location.href
-});
+// Wait for env.js to load and initialize
+function getAgoraAppId() {
+    return new Promise((resolve, reject) => {
+        if (typeof window.AGORA_APP_ID !== 'undefined') {
+            resolve(window.AGORA_APP_ID);
+        } else {
+            // Wait for a short time to see if env.js loads
+            setTimeout(() => {
+                if (typeof window.AGORA_APP_ID !== 'undefined') {
+                    resolve(window.AGORA_APP_ID);
+                } else {
+                    reject(new Error('Agora App ID not found. Please check deployment settings.'));
+                }
+            }, 1000);
+        }
+    });
+}
 
 // Global variables
+let appId = null;
 let rtcClient = null;
 let localAudioTrack = null;
 let isMuted = false;
@@ -269,4 +278,17 @@ leaveBtn.addEventListener('click', leaveCall);
 muteBtn.addEventListener('click', toggleMute);
 
 // Initialize on page load
-window.addEventListener('load', initializeAgoraClient); 
+window.addEventListener('load', async () => {
+    try {
+        appId = await getAgoraAppId();
+        console.log('App initialization:', {
+            appIdLoaded: !!appId,
+            secure: isSecureContext(),
+            url: window.location.href
+        });
+        await initializeAgoraClient();
+    } catch (error) {
+        console.error('Initialization error:', error);
+        showMessage(error.message, true);
+    }
+}); 
