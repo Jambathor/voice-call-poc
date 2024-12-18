@@ -127,7 +127,9 @@ function getBrowserInfo() {
     };
     console.log('Browser Detection:', {
         userAgent,
-        browsers
+        browsers,
+        protocol: window.location.protocol,
+        host: window.location.host
     });
     return browsers;
 }
@@ -320,12 +322,29 @@ muteBtn.addEventListener('click', toggleMute);
 // Initialize on page load
 window.addEventListener('load', async () => {
     try {
-        appId = await getAgoraAppId();
+        // Wait a moment for scripts to load
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        // Check if App ID is already available
+        if (window.AGORA_APP_ID) {
+            appId = window.AGORA_APP_ID;
+            console.log('App ID found immediately');
+        } else {
+            // Wait for App ID to be set
+            appId = await getAgoraAppId();
+        }
+
         console.log('App initialization:', {
             appIdLoaded: !!appId,
+            appIdLength: appId ? appId.length : 0,
             secure: isSecureContext(),
             url: window.location.href
         });
+
+        if (!appId) {
+            throw new Error('Failed to initialize: App ID not found');
+        }
+
         await initializeAgoraClient();
     } catch (error) {
         console.error('Initialization error:', error);

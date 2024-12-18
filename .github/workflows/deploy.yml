@@ -38,30 +38,16 @@ jobs:
           AGORA_APP_ID: ${{ secrets.AGORA_APP_ID }}
         run: |
           echo "Creating env.js with App ID..."
-          # Create the file without variable expansion first
-          cat > env.js << 'EOL'
-          // Agora App ID configuration
-          (function() {
-            console.log('Initializing Agora configuration...');
-            try {
-              window.AGORA_APP_ID = "AGORA_APP_ID_PLACEHOLDER";
-              if (!window.AGORA_APP_ID) {
-                throw new Error('App ID is empty');
-              }
-              console.log('Agora configuration loaded successfully');
-            } catch (error) {
-              console.error('Failed to initialize Agora configuration:', error);
-            }
-          })();
+          # Create the file with immediate execution
+          cat > env.js << EOL
+          window.AGORA_APP_ID = "${AGORA_APP_ID}";
+          console.log('Agora App ID loaded:', window.AGORA_APP_ID ? 'success' : 'failed');
           EOL
-
-          # Now replace the placeholder with the actual App ID
-          sed -i "s/AGORA_APP_ID_PLACEHOLDER/$AGORA_APP_ID/" env.js
 
           echo "Verifying env.js was created:"
           ls -l env.js
           echo "File contents (masked):"
-          cat env.js | sed 's/window.AGORA_APP_ID = "[^"]*"/window.AGORA_APP_ID = "***"/'
+          cat env.js | sed 's/AGORA_APP_ID = .*/AGORA_APP_ID = "***";/'
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v2

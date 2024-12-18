@@ -5,19 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Voice Call POC</title>
     <link rel="stylesheet" href="styles.css">
-    <script>
-        // Error handler for env.js loading
-        window.onerror = function(msg, url, lineNo, columnNo, error) {
-            if (url.endsWith('env.js')) {
-                console.error('Failed to load environment configuration:', msg);
-                document.getElementById('status-messages').innerHTML = 
-                    '<p class="error">Error: Failed to load configuration. Please check deployment settings.</p>';
-            }
-            return false;
-        };
-    </script>
-    <script src="env.js"></script>
-    <script src="https://download.agora.io/sdk/release/AgoraRTC_N.js"></script>
 </head>
 <body>
     <div class="container">
@@ -39,6 +26,24 @@
 
         <div id="status-messages"></div>
     </div>
+
+    <!-- Load scripts in order -->
+    <script>
+        // Error handler for script loading
+        window.onerror = function(msg, url, lineNo, columnNo, error) {
+            console.error('Script error:', { msg, url, lineNo, columnNo, error });
+            const messages = document.getElementById('status-messages');
+            if (messages) {
+                const errorMsg = document.createElement('p');
+                errorMsg.className = 'error';
+                errorMsg.textContent = 'Error loading application: ' + msg;
+                messages.insertBefore(errorMsg, messages.firstChild);
+            }
+            return false;
+        };
+    </script>
+    <script src="env.js"></script>
+    <script src="https://download.agora.io/sdk/release/AgoraRTC_N.js"></script>
     <script src="app.js"></script>
 </body>
 </html> 
