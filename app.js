@@ -1,58 +1,47 @@
 // Wait for env.js to load and initialize
 function getAgoraAppId() {
     return new Promise((resolve, reject) => {
-        const checkAppId = () => {
-            console.log('Checking for Agora App ID...');
-            console.log('window.AGORA_APP_ID type:', typeof window.AGORA_APP_ID);
-            console.log('window.AGORA_APP_ID length:', window.AGORA_APP_ID ? window.AGORA_APP_ID.length : 0);
-            
-            if (window.AGORA_APP_ID && typeof window.AGORA_APP_ID === 'string' && window.AGORA_APP_ID.length > 0) {
-                console.log('Agora App ID found');
-                return true;
-            }
-            console.log('Agora App ID not found or invalid');
-            return false;
-        };
+        if (typeof updateDebugInfo === 'function') {
+            updateDebugInfo('Checking for Agora App ID...');
+            updateDebugInfo(`AGORA_APP_ID type: ${typeof window.AGORA_APP_ID}`);
+            updateDebugInfo(`AGORA_APP_ID present: ${!!window.AGORA_APP_ID}`);
+        }
 
-        // First immediate check
-        if (checkAppId()) {
+        // Since we're now using the window.envLoaded promise,
+        // we can be more direct about checking the App ID
+        if (window.AGORA_APP_ID && typeof window.AGORA_APP_ID === 'string' && window.AGORA_APP_ID.length > 0) {
+            if (typeof updateDebugInfo === 'function') {
+                updateDebugInfo('Agora App ID found immediately');
+            }
             resolve(window.AGORA_APP_ID);
             return;
         }
 
-        // Set up a mutation observer to watch for script loads
-        const observer = new MutationObserver((mutations) => {
-            for (const mutation of mutations) {
-                if (mutation.type === 'childList') {
-                    for (const node of mutation.addedNodes) {
-                        if (node.tagName === 'SCRIPT') {
-                            console.log('Script loaded:', node.src);
-                            if (checkAppId()) {
-                                observer.disconnect();
-                                resolve(window.AGORA_APP_ID);
-                                return;
-                            }
-                        }
-                    }
+        // If we don't have it immediately, wait for the envLoaded promise
+        window.envLoaded
+            .then(() => {
+                if (typeof updateDebugInfo === 'function') {
+                    updateDebugInfo('env.js loaded, checking App ID again');
                 }
-            }
-        });
-
-        observer.observe(document.documentElement, {
-            childList: true,
-            subtree: true
-        });
-
-        // Fallback timeout
-        setTimeout(() => {
-            observer.disconnect();
-            if (checkAppId()) {
-                resolve(window.AGORA_APP_ID);
-            } else {
-                console.error('Available global variables:', Object.keys(window));
-                reject(new Error('Failed to load Agora App ID. Please check your deployment settings.'));
-            }
-        }, 5000);
+                
+                if (window.AGORA_APP_ID && typeof window.AGORA_APP_ID === 'string' && window.AGORA_APP_ID.length > 0) {
+                    if (typeof updateDebugInfo === 'function') {
+                        updateDebugInfo('Agora App ID found after env.js loaded');
+                    }
+                    resolve(window.AGORA_APP_ID);
+                } else {
+                    if (typeof updateDebugInfo === 'function') {
+                        updateDebugInfo('Agora App ID not found after env.js loaded');
+                    }
+                    reject(new Error('Agora App ID not found after env.js loaded'));
+                }
+            })
+            .catch(error => {
+                if (typeof updateDebugInfo === 'function') {
+                    updateDebugInfo(`Error loading env.js: ${error.message}`);
+                }
+                reject(error);
+            });
     });
 }
 
@@ -322,32 +311,33 @@ muteBtn.addEventListener('click', toggleMute);
 // Initialize on page load
 window.addEventListener('load', async () => {
     try {
-        // Wait a moment for scripts to load
-        await new Promise(resolve => setTimeout(resolve, 500));
-        
-        // Check if App ID is already available
-        if (window.AGORA_APP_ID) {
-            appId = window.AGORA_APP_ID;
-            console.log('App ID found immediately');
-        } else {
-            // Wait for App ID to be set
-            appId = await getAgoraAppId();
+        if (typeof updateDebugInfo === 'function') {
+            updateDebugInfo('Page loaded, starting initialization');
         }
 
-        console.log('App initialization:', {
-            appIdLoaded: !!appId,
-            appIdLength: appId ? appId.length : 0,
-            secure: isSecureContext(),
-            url: window.location.href
-        });
+        // Wait for App ID
+        appId = await getAgoraAppId();
+        
+        if (typeof updateDebugInfo === 'function') {
+            updateDebugInfo(`App ID loaded: ${appId ? 'success' : 'failed'}`);
+            updateDebugInfo(`Secure context: ${isSecureContext()}`);
+            updateDebugInfo(`URL: ${window.location.href}`);
+        }
 
         if (!appId) {
             throw new Error('Failed to initialize: App ID not found');
         }
 
         await initializeAgoraClient();
+        
+        if (typeof updateDebugInfo === 'function') {
+            updateDebugInfo('Initialization complete');
+        }
     } catch (error) {
         console.error('Initialization error:', error);
+        if (typeof updateDebugInfo === 'function') {
+            updateDebugInfo(`Initialization error: ${error.message}`);
+        }
         showMessage(error.message, true);
     }
 }); 

@@ -28,26 +28,38 @@ jobs:
         run: |
           if [ -n "${{ secrets.AGORA_APP_ID }}" ]; then
             echo "AGORA_APP_ID is set"
+            echo "Length: ${#AGORA_APP_ID}"
           else
             echo "AGORA_APP_ID is not set"
             exit 1
           fi
+        env:
+          AGORA_APP_ID: ${{ secrets.AGORA_APP_ID }}
 
-      - name: Create env.js with App ID
+      - name: Create and verify env.js
         env:
           AGORA_APP_ID: ${{ secrets.AGORA_APP_ID }}
         run: |
-          echo "Creating env.js with App ID..."
-          # Create the file with immediate execution
-          cat > env.js << EOL
-          window.AGORA_APP_ID = "${AGORA_APP_ID}";
-          console.log('Agora App ID loaded:', window.AGORA_APP_ID ? 'success' : 'failed');
+          echo "Creating env.js..."
+          cat > env.js << 'EOL'
+          // This file is auto-generated during deployment
+          window.AGORA_APP_ID = "${{ secrets.AGORA_APP_ID }}";
+          console.log('[env.js] Setting Agora App ID:', window.AGORA_APP_ID ? 'success' : 'failed');
           EOL
 
           echo "Verifying env.js was created:"
           ls -l env.js
           echo "File contents (masked):"
           cat env.js | sed 's/AGORA_APP_ID = .*/AGORA_APP_ID = "***";/'
+          
+          # Verify the file is not empty and contains the App ID
+          if ! grep -q "window.AGORA_APP_ID" env.js; then
+            echo "Error: env.js does not contain the App ID assignment"
+            exit 1
+          fi
+          
+          # Verify file permissions
+          chmod 644 env.js
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v2
