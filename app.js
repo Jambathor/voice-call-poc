@@ -38,10 +38,15 @@ async function initVolumeIndicator() {
 // Setup event handlers
 function setupEventHandlers() {
     rtcClient.on("user-published", async (user, mediaType) => {
-        await rtcClient.subscribe(user, mediaType);
-        if (mediaType === "audio") {
-            user.audioTrack.play();
-            showMessage('Another user joined the room');
+        try {
+            await rtcClient.subscribe(user, mediaType);
+            if (mediaType === "audio") {
+                user.audioTrack.play();
+                showMessage('Another user joined the room');
+            }
+        } catch (error) {
+            console.error('Subscribe error:', error);
+            showMessage(`Error subscribing to user: ${error.message}`, true);
         }
     });
 
@@ -50,27 +55,37 @@ function setupEventHandlers() {
     });
 
     rtcClient.on("connection-state-change", (curState, prevState) => {
-        showMessage(`Connection state changed from ${prevState} to ${curState}`);
+        console.log(`Connection state changed from ${prevState} to ${curState}`);
+        showMessage(`Connection state: ${curState}`);
+    });
+
+    rtcClient.on("error", (error) => {
+        console.error('RTC Client Error:', error);
+        showMessage(`Error: ${error.message}`, true);
     });
 }
 
 // Cleanup function
 async function cleanup() {
-    if (localAudioTrack) {
-        localAudioTrack.stop();
-        localAudioTrack.close();
-        localAudioTrack = null;
-    }
-    
-    if (rtcClient) {
-        if (isConnected) {
-            await rtcClient.leave();
+    try {
+        if (localAudioTrack) {
+            localAudioTrack.stop();
+            localAudioTrack.close();
+            localAudioTrack = null;
         }
-        rtcClient = null;
+        
+        if (rtcClient) {
+            if (isConnected) {
+                await rtcClient.leave();
+            }
+            rtcClient = null;
+        }
+        
+        isConnected = false;
+        isMuted = false;
+    } catch (error) {
+        console.error('Cleanup error:', error);
     }
-    
-    isConnected = false;
-    isMuted = false;
 }
 
 // Join a call
@@ -87,15 +102,11 @@ async function joinCall() {
         // Cleanup any existing connection
         await cleanup();
 
-        // Create new client with specific configuration for static app ID
+        // Create new client for voice calling
         rtcClient = AgoraRTC.createClient({
             mode: "rtc",
-            codec: "vp8",
-            channelProfile: "live-broadcasting"
+            codec: "vp8"
         });
-
-        // Set the client role
-        await rtcClient.setClientRole("host");
         
         // Setup event handlers before joining
         setupEventHandlers();
@@ -109,13 +120,19 @@ async function joinCall() {
         
         // Create and publish audio track
         localAudioTrack = await AgoraRTC.createMicrophoneAudioTrack({
-            encoderConfig: "music_standard"
+            encoderConfig: {
+                sampleRate: 48000,
+                stereo: false,
+                bitrate: 48
+            }
         });
         
         if (isMuted) {
             localAudioTrack.setEnabled(false);
         }
+
         await rtcClient.publish(localAudioTrack);
+        console.log('Audio track published successfully');
 
         // Update UI
         joinForm.style.display = 'none';
@@ -149,6 +166,7 @@ async function leaveCall() {
         showMessage('Left the room');
 
     } catch (error) {
+        console.error('Leave Error:', error);
         showMessage(`Error: ${error.message}`, true);
     }
 }
