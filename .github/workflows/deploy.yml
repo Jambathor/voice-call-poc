@@ -18,53 +18,52 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@v3
 
-      - name: Setup Pages
+      - name: Setup GitHub Pages
         uses: actions/configure-pages@v3
 
-      - name: Debug Secrets
+      - name: Verify Agora App ID secret
+        env:
+          AGORA_APP_ID: ${{ secrets.AGORA_APP_ID }}
         run: |
-          if [ -n "${{ secrets.AGORA_APP_ID }}" ]; then
-            echo "AGORA_APP_ID is set"
-            echo "Length: ${#AGORA_APP_ID}"
+          if [ -n "$AGORA_APP_ID" ]; then
+            echo "✓ AGORA_APP_ID is set and not empty"
           else
-            echo "AGORA_APP_ID is not set"
+            echo "✗ AGORA_APP_ID is not set"
             exit 1
           fi
-        env:
-          AGORA_APP_ID: ${{ secrets.AGORA_APP_ID }}
 
-      - name: Create and verify env.js
+      - name: Generate env.js with Agora App ID
         env:
           AGORA_APP_ID: ${{ secrets.AGORA_APP_ID }}
         run: |
-          echo "Creating env.js..."
-          cat > env.js << 'EOL'
-          // This file is auto-generated during deployment
-          window.AGORA_APP_ID = "${{ secrets.AGORA_APP_ID }}";
-          console.log('[env.js] Setting Agora App ID:', window.AGORA_APP_ID ? 'success' : 'failed');
-          EOL
-
-          echo "Verifying env.js was created:"
-          ls -l env.js
-          echo "File contents (masked):"
-          cat env.js | sed 's/AGORA_APP_ID = .*/AGORA_APP_ID = "***";/'
+          # Create env.js with the App ID
+          echo "window.AGORA_APP_ID = '${AGORA_APP_ID}';" > env.js
           
-          # Verify the file is not empty and contains the App ID
-          if ! grep -q "window.AGORA_APP_ID" env.js; then
-            echo "Error: env.js does not contain the App ID assignment"
+          # Verify file was created with content
+          if [ ! -s env.js ]; then
+            echo "Error: env.js is empty"
             exit 1
           fi
-          
-          # Verify file permissions
-          chmod 644 env.js
 
-      - name: Upload artifact
+      - name: Prepare deployment files
+        run: |
+          # Create a temporary directory for deployment files
+          mkdir deploy
+          
+          # Copy only required files
+          cp index.html deploy/
+          cp styles.css deploy/
+          cp app.js deploy/
+          cp env.js deploy/
+          cp README.md deploy/
+
+      - name: Upload deployment artifact
         uses: actions/upload-pages-artifact@v2
         with:
-          path: '.'
+          path: deploy
 
       - name: Deploy to GitHub Pages
         id: deployment
