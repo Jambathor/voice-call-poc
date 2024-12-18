@@ -39,10 +39,13 @@ async function initVolumeIndicator() {
 function setupEventHandlers() {
     rtcClient.on("user-published", async (user, mediaType) => {
         try {
+            // Subscribe to remote user
             await rtcClient.subscribe(user, mediaType);
+            console.log('Subscribe success:', user.uid, mediaType);
+            
             if (mediaType === "audio") {
                 user.audioTrack.play();
-                showMessage('Another user joined the room');
+                showMessage(`User ${user.uid} joined and is now speaking`);
             }
         } catch (error) {
             console.error('Subscribe error:', error);
@@ -51,17 +54,34 @@ function setupEventHandlers() {
     });
 
     rtcClient.on("user-left", async (user) => {
-        showMessage('A user left the room');
+        console.log('User left:', user.uid);
+        showMessage(`User ${user.uid} left the room`);
+    });
+
+    rtcClient.on("user-unpublished", async (user, mediaType) => {
+        console.log('User unpublished:', user.uid, mediaType);
+        if (mediaType === "audio") {
+            showMessage(`User ${user.uid} stopped speaking`);
+        }
     });
 
     rtcClient.on("connection-state-change", (curState, prevState) => {
         console.log(`Connection state changed from ${prevState} to ${curState}`);
         showMessage(`Connection state: ${curState}`);
+        
+        if (curState === "DISCONNECTED") {
+            cleanup();
+        }
     });
 
     rtcClient.on("error", (error) => {
         console.error('RTC Client Error:', error);
         showMessage(`Error: ${error.message}`, true);
+    });
+
+    rtcClient.on("token-privilege-will-expire", async function() {
+        showMessage("Token is about to expire", true);
+        // Here you would typically implement token renewal
     });
 }
 
@@ -104,15 +124,19 @@ async function joinCall() {
 
         // Create new client for voice calling
         rtcClient = AgoraRTC.createClient({
-            mode: "rtc",
+            mode: "live",
             codec: "vp8"
         });
         
+        // Set client role as host (required for live mode)
+        await rtcClient.setClientRole("host");
+
         // Setup event handlers before joining
         setupEventHandlers();
 
-        // Join the channel with our random user ID
-        await rtcClient.join(window.AGORA_APP_ID, roomName, null, userId);
+        // Join the channel with our random user ID and null token
+        const token = null;  // For testing with App ID only
+        await rtcClient.join(window.AGORA_APP_ID, roomName, token, userId);
         isConnected = true;
         
         // Initialize volume indicator
@@ -124,7 +148,8 @@ async function joinCall() {
                 sampleRate: 48000,
                 stereo: false,
                 bitrate: 48
-            }
+            },
+            microphoneId: "default"
         });
         
         if (isMuted) {
@@ -201,4 +226,12 @@ window.addEventListener('load', () => {
     
     // Enable detailed logging for debugging
     AgoraRTC.enableLogUpload();
+    
+    // Check if browser supports necessary features
+    AgoraRTC.checkSystemRequirements()
+        .then(result => {
+            if (!result) {
+                showMessage('Your browser may not fully support voice calls. Please use a modern browser.', true);
+            }
+        });
 }); 
