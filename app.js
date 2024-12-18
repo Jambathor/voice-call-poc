@@ -3,11 +3,14 @@ function getAgoraAppId() {
     return new Promise((resolve, reject) => {
         const checkAppId = () => {
             console.log('Checking for Agora App ID...');
-            if (window.AGORA_APP_ID && window.AGORA_APP_ID.length > 0) {
+            console.log('window.AGORA_APP_ID type:', typeof window.AGORA_APP_ID);
+            console.log('window.AGORA_APP_ID length:', window.AGORA_APP_ID ? window.AGORA_APP_ID.length : 0);
+            
+            if (window.AGORA_APP_ID && typeof window.AGORA_APP_ID === 'string' && window.AGORA_APP_ID.length > 0) {
                 console.log('Agora App ID found');
                 return true;
             }
-            console.log('Agora App ID not found');
+            console.log('Agora App ID not found or invalid');
             return false;
         };
 
@@ -19,9 +22,19 @@ function getAgoraAppId() {
 
         // Set up a mutation observer to watch for script loads
         const observer = new MutationObserver((mutations) => {
-            if (checkAppId()) {
-                observer.disconnect();
-                resolve(window.AGORA_APP_ID);
+            for (const mutation of mutations) {
+                if (mutation.type === 'childList') {
+                    for (const node of mutation.addedNodes) {
+                        if (node.tagName === 'SCRIPT') {
+                            console.log('Script loaded:', node.src);
+                            if (checkAppId()) {
+                                observer.disconnect();
+                                resolve(window.AGORA_APP_ID);
+                                return;
+                            }
+                        }
+                    }
+                }
             }
         });
 
@@ -36,6 +49,7 @@ function getAgoraAppId() {
             if (checkAppId()) {
                 resolve(window.AGORA_APP_ID);
             } else {
+                console.error('Available global variables:', Object.keys(window));
                 reject(new Error('Failed to load Agora App ID. Please check your deployment settings.'));
             }
         }, 5000);
