@@ -3,6 +3,9 @@ let localAudioTrack = null;
 let isMuted = false;
 let isConnected = false;
 
+// Generate a random user ID
+const userId = Math.floor(Math.random() * 2032);
+
 // DOM elements
 const joinForm = document.getElementById('join-form');
 const callControls = document.getElementById('call-controls');
@@ -18,6 +21,37 @@ function showMessage(text, isError = false) {
     msg.style.color = isError ? 'red' : 'green';
     messages.insertBefore(msg, messages.firstChild);
     setTimeout(() => msg.remove(), 5000);
+}
+
+// Initialize volume indicator
+async function initVolumeIndicator() {
+    AgoraRTC.setParameter('AUDIO_VOLUME_INDICATION_INTERVAL', 200);
+    rtcClient.enableAudioVolumeIndicator();
+
+    rtcClient.on("volume-indicator", volumes => {
+        volumes.forEach(volume => {
+            console.log(`User ${volume.uid} speaking level: ${volume.level}`);
+        });
+    });
+}
+
+// Setup event handlers
+function setupEventHandlers() {
+    rtcClient.on("user-published", async (user, mediaType) => {
+        await rtcClient.subscribe(user, mediaType);
+        if (mediaType === "audio") {
+            user.audioTrack.play();
+            showMessage('Another user joined the room');
+        }
+    });
+
+    rtcClient.on("user-left", async (user) => {
+        showMessage('A user left the room');
+    });
+
+    rtcClient.on("connection-state-change", (curState, prevState) => {
+        showMessage(`Connection state changed from ${prevState} to ${curState}`);
+    });
 }
 
 // Cleanup function
@@ -53,33 +87,42 @@ async function joinCall() {
         // Cleanup any existing connection
         await cleanup();
 
-        // Create new client
-        rtcClient = AgoraRTC.createClient({ mode: "rtc", codec: "vp8" });
+        // Create new client with specific configuration for static app ID
+        rtcClient = AgoraRTC.createClient({
+            mode: "live",  // Changed from "rtc" to "live"
+            codec: "vp8",
+            role: "host"   // Added role specification
+        });
+        
+        // Setup event handlers before joining
+        setupEventHandlers();
 
-        // Join the channel
-        await rtcClient.join(window.AGORA_APP_ID, roomName, null, null);
+        // Join the channel with our random user ID
+        await rtcClient.join(window.AGORA_APP_ID, roomName, null, userId);
         isConnected = true;
         
-        // Create and publish audio track
-        localAudioTrack = await AgoraRTC.createMicrophoneAudioTrack();
+        // Initialize volume indicator
+        await initVolumeIndicator();
+        
+        // Create and publish audio track with specific configuration
+        localAudioTrack = await AgoraRTC.createMicrophoneAudioTrack({
+            encoderConfig: "music_standard"  // Added specific audio configuration
+        });
+        
+        if (isMuted) {
+            localAudioTrack.setEnabled(false);
+        }
         await rtcClient.publish(localAudioTrack);
 
         // Update UI
         joinForm.style.display = 'none';
         callControls.style.display = 'block';
         document.getElementById('roomDisplay').textContent = `Room: ${roomName}`;
-        document.getElementById('participantName').textContent = `Joined as: ${username}`;
+        document.getElementById('participantName').textContent = `Joined as: ${username} (ID: ${userId})`;
         showMessage('Successfully joined the room!');
 
-        // Handle remote users
-        rtcClient.on('user-published', async (user, mediaType) => {
-            await rtcClient.subscribe(user, mediaType);
-            showMessage('Another user joined the room');
-        });
-
-        rtcClient.on('user-left', () => showMessage('A user left the room'));
-
     } catch (error) {
+        console.error('Join Error:', error);  // Added detailed error logging
         showMessage(`Error: ${error.message}`, true);
         await cleanup();
         
@@ -125,9 +168,13 @@ muteBtn.addEventListener('click', toggleMute);
 // Cleanup on page unload
 window.addEventListener('beforeunload', cleanup);
 
-// Check for App ID on load
+// Check for App ID and initialize AgoraRTC
 window.addEventListener('load', () => {
     if (!window.AGORA_APP_ID) {
         showMessage('Error: Agora App ID not found. Please check your deployment settings.', true);
+        return;
     }
+    
+    // Initialize AgoraRTC client options
+    AgoraRTC.setLogLevel(1); // Set to INFO level for better debugging
 }); 
