@@ -2,8 +2,7 @@ name: Deploy to GitHub Pages
 
 on:
   push:
-    branches:
-      - main
+    branches: [ main ]
   workflow_dispatch:
 
 permissions:
@@ -18,38 +17,18 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
-
-      - name: Setup GitHub Pages
-        uses: actions/configure-pages@v3
-
-      - name: Verify and inject Agora App ID
-        env:
-          AGORA_APP_ID: ${{ secrets.AGORA_APP_ID }}
+      - uses: actions/checkout@v3
+      - uses: actions/configure-pages@v3
+      
+      - name: Inject Agora App ID
         run: |
-          if [ -z "$AGORA_APP_ID" ]; then
-            echo "✗ AGORA_APP_ID is not set"
-            exit 1
-          fi
+          # For testing, directly inject the App ID into index.html
+          sed -i '/<head>/a \    <script>window.AGORA_APP_ID = "${{ secrets.AGORA_APP_ID }}";</script>' index.html
           
-          # Create a temporary index file with the App ID injected
-          sed "s|</head>|<script>window.AGORA_APP_ID = '${AGORA_APP_ID}';</script></head>|" index.html > index.tmp.html
-          mv index.tmp.html index.html
-
-      - name: Prepare deployment files
-        run: |
-          mkdir -p deploy
-          cp index.html deploy/
-          cp styles.css deploy/
-          cp app.js deploy/
-          cp README.md deploy/
-
-      - name: Upload deployment artifact
+      - name: Upload artifact
         uses: actions/upload-pages-artifact@v2
         with:
-          path: deploy
-
+          path: .
+          
       - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v2
+        uses: actions/deploy-pages@v2 

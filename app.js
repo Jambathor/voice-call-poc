@@ -1,4 +1,3 @@
-// Global variables
 let rtcClient = null;
 let localAudioTrack = null;
 let isMuted = false;
@@ -9,59 +8,21 @@ const callControls = document.getElementById('call-controls');
 const joinBtn = document.getElementById('joinBtn');
 const leaveBtn = document.getElementById('leaveBtn');
 const muteBtn = document.getElementById('muteBtn');
-const usernameInput = document.getElementById('username');
-const roomNameInput = document.getElementById('roomName');
-const roomDisplay = document.getElementById('roomDisplay');
-const participantName = document.getElementById('participantName');
-const statusMessages = document.getElementById('status-messages');
-const debugInfo = document.getElementById('debug-info');
+const messages = document.getElementById('messages');
 
-// Helper function to display debug messages
-function updateDebugInfo(message) {
-    if (debugInfo) {
-        const timestamp = new Date().toISOString();
-        debugInfo.innerHTML += `<div>[${timestamp}] ${message}</div>`;
-    }
+// Show messages to user
+function showMessage(text, isError = false) {
+    const msg = document.createElement('p');
+    msg.textContent = text;
+    msg.style.color = isError ? 'red' : 'green';
+    messages.insertBefore(msg, messages.firstChild);
+    setTimeout(() => msg.remove(), 5000);
 }
 
-// Helper function to display status messages
-function showMessage(message, isError = false) {
-    const messageElement = document.createElement('p');
-    messageElement.textContent = message;
-    messageElement.className = isError ? 'error' : 'success';
-    statusMessages.insertBefore(messageElement, statusMessages.firstChild);
-    setTimeout(() => messageElement.remove(), 5000);
-}
-
-// Check if we're in a secure context
-function isSecureContext() {
-    return window.isSecureContext || location.protocol === 'https:' || location.hostname === 'localhost';
-}
-
-// Initialize Agora client
-async function initializeAgoraClient() {
-    if (!window.AGORA_APP_ID) {
-        throw new Error('Agora App ID is not set');
-    }
-
-    if (!isSecureContext()) {
-        throw new Error('This application requires a secure context (HTTPS or localhost)');
-    }
-
-    try {
-        rtcClient = AgoraRTC.createClient({ mode: "rtc", codec: "vp8" });
-        updateDebugInfo('Agora client initialized successfully');
-        return true;
-    } catch (error) {
-        updateDebugInfo(`Failed to initialize Agora client: ${error.message}`);
-        throw error;
-    }
-}
-
-// Join a voice call
+// Join a call
 async function joinCall() {
-    const username = usernameInput.value.trim();
-    const roomName = roomNameInput.value.trim();
+    const username = document.getElementById('username').value.trim();
+    const roomName = document.getElementById('roomName').value.trim();
 
     if (!username || !roomName) {
         showMessage('Please enter both username and room name', true);
@@ -69,77 +30,65 @@ async function joinCall() {
     }
 
     try {
-        // Initialize client if not already initialized
+        // Initialize client if not already done
         if (!rtcClient) {
-            await initializeAgoraClient();
+            rtcClient = AgoraRTC.createClient({ mode: "rtc", codec: "vp8" });
         }
 
         // Join the channel
-        const uid = await rtcClient.join(window.AGORA_APP_ID, roomName, null, null);
-        updateDebugInfo(`Joined channel: ${roomName}`);
+        await rtcClient.join(window.AGORA_APP_ID, roomName, null, null);
         
         // Create and publish audio track
         localAudioTrack = await AgoraRTC.createMicrophoneAudioTrack();
         await rtcClient.publish(localAudioTrack);
-        updateDebugInfo('Local audio track published');
 
         // Update UI
         joinForm.style.display = 'none';
         callControls.style.display = 'block';
-        roomDisplay.textContent = `Room: ${roomName}`;
-        participantName.textContent = `Joined as: ${username}`;
+        document.getElementById('roomDisplay').textContent = `Room: ${roomName}`;
+        document.getElementById('participantName').textContent = `Joined as: ${username}`;
         showMessage('Successfully joined the room!');
 
-        // Set up event listeners for remote users
+        // Handle remote users
         rtcClient.on('user-published', async (user, mediaType) => {
             await rtcClient.subscribe(user, mediaType);
-            showMessage(`Another user joined the room`);
+            showMessage('Another user joined the room');
         });
 
-        rtcClient.on('user-left', async (user) => {
-            showMessage(`A user left the room`);
-        });
+        rtcClient.on('user-left', () => showMessage('A user left the room'));
 
     } catch (error) {
-        updateDebugInfo(`Error joining call: ${error.message}`);
-        showMessage(`Error joining call: ${error.message}`, true);
-        
-        if (error.message.includes('Permission denied') || error.message.includes('NotAllowedError')) {
-            showMessage('Please allow microphone access to join the call', true);
-        }
+        showMessage(`Error: ${error.message}`, true);
     }
 }
 
-// Leave the voice call
+// Leave the call
 async function leaveCall() {
     try {
         if (localAudioTrack) {
             localAudioTrack.stop();
             localAudioTrack.close();
         }
-
-        await rtcClient.leave();
-        updateDebugInfo('Left the channel');
-
+        await rtcClient?.leave();
+        
         // Reset UI
         joinForm.style.display = 'block';
         callControls.style.display = 'none';
-        roomDisplay.textContent = '';
-        participantName.textContent = '';
-        showMessage('Successfully left the room');
+        document.getElementById('roomDisplay').textContent = '';
+        document.getElementById('participantName').textContent = '';
+        showMessage('Left the room');
 
-        // Reset variables
+        // Reset state
         localAudioTrack = null;
         isMuted = false;
         muteBtn.textContent = 'Mute';
 
     } catch (error) {
-        updateDebugInfo(`Error leaving call: ${error.message}`);
-        showMessage(`Error leaving call: ${error.message}`, true);
+        showMessage(`Error: ${error.message}`, true);
     }
 }
 
-// Toggle mute/unmute
+// Toggle mute
 function toggleMute() {
     if (localAudioTrack) {
         isMuted = !isMuted;
@@ -154,22 +103,9 @@ joinBtn.addEventListener('click', joinCall);
 leaveBtn.addEventListener('click', leaveCall);
 muteBtn.addEventListener('click', toggleMute);
 
-// Initialize on page load
-window.addEventListener('load', async () => {
-    try {
-        updateDebugInfo('Application starting...');
-        updateDebugInfo(`Secure context: ${isSecureContext()}`);
-        updateDebugInfo(`URL: ${window.location.href}`);
-        
-        if (!window.AGORA_APP_ID) {
-            throw new Error('Agora App ID not found');
-        }
-        
-        updateDebugInfo('Agora App ID is set');
-        await initializeAgoraClient();
-        updateDebugInfo('Initialization complete');
-    } catch (error) {
-        updateDebugInfo(`Initialization error: ${error.message}`);
-        showMessage(error.message, true);
+// Check for App ID on load
+window.addEventListener('load', () => {
+    if (!window.AGORA_APP_ID) {
+        showMessage('Error: Agora App ID not found. Please check your deployment settings.', true);
     }
 }); 
