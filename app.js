@@ -1,60 +1,7 @@
-// Wait for env.js to load and initialize
-function getAgoraAppId() {
-    return new Promise((resolve, reject) => {
-        if (typeof updateDebugInfo === 'function') {
-            updateDebugInfo('Checking for Agora App ID...');
-            updateDebugInfo(`AGORA_APP_ID type: ${typeof window.AGORA_APP_ID}`);
-            updateDebugInfo(`AGORA_APP_ID present: ${!!window.AGORA_APP_ID}`);
-        }
-
-        // Since we're now using the window.envLoaded promise,
-        // we can be more direct about checking the App ID
-        if (window.AGORA_APP_ID && typeof window.AGORA_APP_ID === 'string' && window.AGORA_APP_ID.length > 0) {
-            if (typeof updateDebugInfo === 'function') {
-                updateDebugInfo('Agora App ID found immediately');
-            }
-            resolve(window.AGORA_APP_ID);
-            return;
-        }
-
-        // If we don't have it immediately, wait for the envLoaded promise
-        window.envLoaded
-            .then(() => {
-                if (typeof updateDebugInfo === 'function') {
-                    updateDebugInfo('env.js loaded, checking App ID again');
-                }
-                
-                if (window.AGORA_APP_ID && typeof window.AGORA_APP_ID === 'string' && window.AGORA_APP_ID.length > 0) {
-                    if (typeof updateDebugInfo === 'function') {
-                        updateDebugInfo('Agora App ID found after env.js loaded');
-                    }
-                    resolve(window.AGORA_APP_ID);
-                } else {
-                    if (typeof updateDebugInfo === 'function') {
-                        updateDebugInfo('Agora App ID not found after env.js loaded');
-                    }
-                    reject(new Error('Agora App ID not found after env.js loaded'));
-                }
-            })
-            .catch(error => {
-                if (typeof updateDebugInfo === 'function') {
-                    updateDebugInfo(`Error loading env.js: ${error.message}`);
-                }
-                reject(error);
-            });
-    });
-}
-
 // Global variables
-let appId = null;
 let rtcClient = null;
 let localAudioTrack = null;
 let isMuted = false;
-
-// Check if we're in a secure context
-function isSecureContext() {
-    return window.isSecureContext || location.protocol === 'https:' || location.hostname === 'localhost';
-}
 
 // DOM elements
 const joinForm = document.getElementById('join-form');
@@ -67,6 +14,15 @@ const roomNameInput = document.getElementById('roomName');
 const roomDisplay = document.getElementById('roomDisplay');
 const participantName = document.getElementById('participantName');
 const statusMessages = document.getElementById('status-messages');
+const debugInfo = document.getElementById('debug-info');
+
+// Helper function to display debug messages
+function updateDebugInfo(message) {
+    if (debugInfo) {
+        const timestamp = new Date().toISOString();
+        debugInfo.innerHTML += `<div>[${timestamp}] ${message}</div>`;
+    }
+}
 
 // Helper function to display status messages
 function showMessage(message, isError = false) {
@@ -77,112 +33,27 @@ function showMessage(message, isError = false) {
     setTimeout(() => messageElement.remove(), 5000);
 }
 
+// Check if we're in a secure context
+function isSecureContext() {
+    return window.isSecureContext || location.protocol === 'https:' || location.hostname === 'localhost';
+}
+
 // Initialize Agora client
 async function initializeAgoraClient() {
-    if (!appId) {
-        showMessage('Error: Agora App ID is not set', true);
-        return false;
+    if (!window.AGORA_APP_ID) {
+        throw new Error('Agora App ID is not set');
     }
 
     if (!isSecureContext()) {
-        showMessage('Error: This application requires a secure context (HTTPS or localhost)', true);
-        return false;
+        throw new Error('This application requires a secure context (HTTPS or localhost)');
     }
 
     try {
         rtcClient = AgoraRTC.createClient({ mode: "rtc", codec: "vp8" });
-        
-        // Check if the browser supports the required features
-        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-            throw new Error('Your browser does not support the required media features. Please use a modern browser.');
-        }
-
+        updateDebugInfo('Agora client initialized successfully');
         return true;
     } catch (error) {
-        showMessage(`Error initializing Agora client: ${error.message}`, true);
-        return false;
-    }
-}
-
-// Helper function to detect browser type
-function getBrowserInfo() {
-    const userAgent = navigator.userAgent;
-    const browsers = {
-        chrome: /chrome/i.test(userAgent),
-        safari: /safari/i.test(userAgent),
-        firefox: /firefox/i.test(userAgent),
-        isSafariMobile: /iphone|ipod|ipad/i.test(userAgent) && /safari/i.test(userAgent),
-        isChromeMobile: /android/i.test(userAgent) && /chrome/i.test(userAgent)
-    };
-    console.log('Browser Detection:', {
-        userAgent,
-        browsers,
-        protocol: window.location.protocol,
-        host: window.location.host
-    });
-    return browsers;
-}
-
-// Helper function to handle different getUserMedia implementations
-async function getMediaStream() {
-    const browserInfo = getBrowserInfo();
-    console.log('Checking media devices:', {
-        mediaDevices: !!navigator.mediaDevices,
-        getUserMedia: !!navigator.mediaDevices?.getUserMedia,
-        webkitGetUserMedia: !!navigator.webkitGetUserMedia,
-        mozGetUserMedia: !!navigator.mozGetUserMedia
-    });
-
-    try {
-        // Special handling for Safari mobile
-        if (browserInfo.isSafariMobile) {
-            if (navigator.mediaDevices?.getUserMedia) {
-                console.log('Using Safari mobile modern API');
-                return await navigator.mediaDevices.getUserMedia({ 
-                    audio: true,
-                    video: false // Explicitly disable video
-                });
-            }
-        }
-
-        // Modern API for other browsers
-        if (navigator.mediaDevices?.getUserMedia) {
-            console.log('Using modern API');
-            return await navigator.mediaDevices.getUserMedia({ audio: true });
-        }
-
-        // Legacy API fallback with promise wrapper
-        console.log('Trying legacy API');
-        const getUserMedia = (
-            navigator.getUserMedia ||
-            navigator.webkitGetUserMedia ||
-            navigator.mozGetUserMedia ||
-            navigator.msGetUserMedia
-        );
-
-        if (!getUserMedia) {
-            throw new Error(`Microphone access not available. Please ensure you're using a supported browser and have granted microphone permissions.`);
-        }
-
-        return new Promise((resolve, reject) => {
-            getUserMedia.call(navigator, 
-                { audio: true, video: false },
-                stream => {
-                    console.log('Legacy API success');
-                    resolve(stream);
-                },
-                error => {
-                    console.error('Legacy API error:', error);
-                    reject(error);
-                }
-            );
-        });
-    } catch (error) {
-        console.error('MediaStream Error:', {
-            name: error.name,
-            message: error.message,
-            stack: error.stack
-        });
+        updateDebugInfo(`Failed to initialize Agora client: ${error.message}`);
         throw error;
     }
 }
@@ -198,48 +69,19 @@ async function joinCall() {
     }
 
     try {
-        // Check for microphone permission first
-        try {
-            console.log('Requesting microphone access...');
-            const stream = await getMediaStream();
-            console.log('Microphone access granted');
-            stream.getTracks().forEach(track => {
-                console.log('Stopping track:', track.kind);
-                track.stop();
-            });
-        } catch (err) {
-            console.error('Microphone access error:', {
-                name: err.name,
-                message: err.message,
-                stack: err.stack
-            });
-
-            if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
-                showMessage('Please allow microphone access to join the call. You may need to refresh the page after allowing access.', true);
-            } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
-                showMessage('No microphone found. Please check your microphone connection and settings.', true);
-            } else {
-                showMessage(`Microphone error: ${err.message}`, true);
-            }
-            return;
-        }
-
         // Initialize client if not already initialized
-        if (!rtcClient && !(await initializeAgoraClient())) {
-            return;
+        if (!rtcClient) {
+            await initializeAgoraClient();
         }
 
         // Join the channel
-        const uid = await rtcClient.join(appId, roomName, null, null);
+        const uid = await rtcClient.join(window.AGORA_APP_ID, roomName, null, null);
+        updateDebugInfo(`Joined channel: ${roomName}`);
         
         // Create and publish audio track
-        try {
-            localAudioTrack = await AgoraRTC.createMicrophoneAudioTrack();
-            await rtcClient.publish(localAudioTrack);
-        } catch (error) {
-            await rtcClient.leave(); // Clean up if audio track creation fails
-            throw error;
-        }
+        localAudioTrack = await AgoraRTC.createMicrophoneAudioTrack();
+        await rtcClient.publish(localAudioTrack);
+        updateDebugInfo('Local audio track published');
 
         // Update UI
         joinForm.style.display = 'none';
@@ -259,22 +101,25 @@ async function joinCall() {
         });
 
     } catch (error) {
+        updateDebugInfo(`Error joining call: ${error.message}`);
         showMessage(`Error joining call: ${error.message}`, true);
-        console.error('Detailed error:', error);
+        
+        if (error.message.includes('Permission denied') || error.message.includes('NotAllowedError')) {
+            showMessage('Please allow microphone access to join the call', true);
+        }
     }
 }
 
 // Leave the voice call
 async function leaveCall() {
     try {
-        // Stop and close the local audio track
         if (localAudioTrack) {
             localAudioTrack.stop();
             localAudioTrack.close();
         }
 
-        // Leave the channel
         await rtcClient.leave();
+        updateDebugInfo('Left the channel');
 
         // Reset UI
         joinForm.style.display = 'block';
@@ -289,6 +134,7 @@ async function leaveCall() {
         muteBtn.textContent = 'Mute';
 
     } catch (error) {
+        updateDebugInfo(`Error leaving call: ${error.message}`);
         showMessage(`Error leaving call: ${error.message}`, true);
     }
 }
@@ -311,33 +157,19 @@ muteBtn.addEventListener('click', toggleMute);
 // Initialize on page load
 window.addEventListener('load', async () => {
     try {
-        if (typeof updateDebugInfo === 'function') {
-            updateDebugInfo('Page loaded, starting initialization');
-        }
-
-        // Wait for App ID
-        appId = await getAgoraAppId();
+        updateDebugInfo('Application starting...');
+        updateDebugInfo(`Secure context: ${isSecureContext()}`);
+        updateDebugInfo(`URL: ${window.location.href}`);
         
-        if (typeof updateDebugInfo === 'function') {
-            updateDebugInfo(`App ID loaded: ${appId ? 'success' : 'failed'}`);
-            updateDebugInfo(`Secure context: ${isSecureContext()}`);
-            updateDebugInfo(`URL: ${window.location.href}`);
+        if (!window.AGORA_APP_ID) {
+            throw new Error('Agora App ID not found');
         }
-
-        if (!appId) {
-            throw new Error('Failed to initialize: App ID not found');
-        }
-
+        
+        updateDebugInfo('Agora App ID is set');
         await initializeAgoraClient();
-        
-        if (typeof updateDebugInfo === 'function') {
-            updateDebugInfo('Initialization complete');
-        }
+        updateDebugInfo('Initialization complete');
     } catch (error) {
-        console.error('Initialization error:', error);
-        if (typeof updateDebugInfo === 'function') {
-            updateDebugInfo(`Initialization error: ${error.message}`);
-        }
+        updateDebugInfo(`Initialization error: ${error.message}`);
         showMessage(error.message, true);
     }
 }); 

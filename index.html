@@ -28,62 +28,10 @@
         <div id="debug-info" style="margin-top: 20px; font-size: 12px; color: #666;"></div>
     </div>
 
-    <!-- Load env.js first and ensure it's loaded -->
-    <script>
-        // Debug information display
-        function updateDebugInfo(message) {
-            const debugDiv = document.getElementById('debug-info');
-            const timestamp = new Date().toISOString();
-            debugDiv.innerHTML += `<div>[${timestamp}] ${message}</div>`;
-        }
-
-        // Create a promise to track env.js loading
-        window.envLoaded = new Promise((resolve, reject) => {
-            const envScript = document.createElement('script');
-            envScript.src = 'env.js';
-            envScript.onload = () => {
-                updateDebugInfo('env.js loaded');
-                if (window.AGORA_APP_ID) {
-                    updateDebugInfo('AGORA_APP_ID found after env.js load');
-                } else {
-                    updateDebugInfo('AGORA_APP_ID not found after env.js load');
-                }
-                resolve();
-            };
-            envScript.onerror = () => {
-                updateDebugInfo('Failed to load env.js');
-                reject(new Error('Failed to load env.js'));
-            };
-            document.head.appendChild(envScript);
-        });
-
-        // Error handler for script loading
-        window.onerror = function(msg, url, lineNo, columnNo, error) {
-            updateDebugInfo(`Error: ${msg} at ${url}:${lineNo}`);
-            return false;
-        };
-    </script>
-
-    <!-- Load other scripts after env.js -->
-    <script>
-        window.envLoaded.then(() => {
-            updateDebugInfo('Loading Agora SDK...');
-            const agoraScript = document.createElement('script');
-            agoraScript.src = 'https://download.agora.io/sdk/release/AgoraRTC_N.js';
-            agoraScript.onload = () => {
-                updateDebugInfo('Agora SDK loaded');
-                // Load app.js only after Agora SDK is loaded
-                const appScript = document.createElement('script');
-                appScript.src = 'app.js';
-                appScript.onload = () => updateDebugInfo('app.js loaded');
-                appScript.onerror = () => updateDebugInfo('Failed to load app.js');
-                document.body.appendChild(appScript);
-            };
-            agoraScript.onerror = () => updateDebugInfo('Failed to load Agora SDK');
-            document.body.appendChild(agoraScript);
-        }).catch(error => {
-            updateDebugInfo(`Failed to initialize: ${error.message}`);
-        });
-    </script>
+    <!-- Load Agora SDK -->
+    <script src="https://download.agora.io/sdk/release/AgoraRTC_N.js"></script>
+    
+    <!-- Load application code -->
+    <script src="app.js"></script>
 </body>
 </html> 

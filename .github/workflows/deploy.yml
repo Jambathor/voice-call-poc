@@ -24,40 +24,25 @@ jobs:
       - name: Setup GitHub Pages
         uses: actions/configure-pages@v3
 
-      - name: Verify Agora App ID secret
+      - name: Verify and inject Agora App ID
         env:
           AGORA_APP_ID: ${{ secrets.AGORA_APP_ID }}
         run: |
-          if [ -n "$AGORA_APP_ID" ]; then
-            echo "✓ AGORA_APP_ID is set and not empty"
-          else
+          if [ -z "$AGORA_APP_ID" ]; then
             echo "✗ AGORA_APP_ID is not set"
             exit 1
           fi
-
-      - name: Generate env.js with Agora App ID
-        env:
-          AGORA_APP_ID: ${{ secrets.AGORA_APP_ID }}
-        run: |
-          # Create env.js with the App ID
-          echo "window.AGORA_APP_ID = '${AGORA_APP_ID}';" > env.js
           
-          # Verify file was created with content
-          if [ ! -s env.js ]; then
-            echo "Error: env.js is empty"
-            exit 1
-          fi
+          # Create a temporary index file with the App ID injected
+          sed "s|</head>|<script>window.AGORA_APP_ID = '${AGORA_APP_ID}';</script></head>|" index.html > index.tmp.html
+          mv index.tmp.html index.html
 
       - name: Prepare deployment files
         run: |
-          # Create a temporary directory for deployment files
-          mkdir deploy
-          
-          # Copy only required files
+          mkdir -p deploy
           cp index.html deploy/
           cp styles.css deploy/
           cp app.js deploy/
-          cp env.js deploy/
           cp README.md deploy/
 
       - name: Upload deployment artifact
