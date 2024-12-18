@@ -1,6 +1,7 @@
 let rtcClient = null;
 let localAudioTrack = null;
 let isMuted = false;
+let isConnected = false;
 
 // DOM elements
 const joinForm = document.getElementById('join-form');
@@ -19,6 +20,25 @@ function showMessage(text, isError = false) {
     setTimeout(() => msg.remove(), 5000);
 }
 
+// Cleanup function
+async function cleanup() {
+    if (localAudioTrack) {
+        localAudioTrack.stop();
+        localAudioTrack.close();
+        localAudioTrack = null;
+    }
+    
+    if (rtcClient) {
+        if (isConnected) {
+            await rtcClient.leave();
+        }
+        rtcClient = null;
+    }
+    
+    isConnected = false;
+    isMuted = false;
+}
+
 // Join a call
 async function joinCall() {
     const username = document.getElementById('username').value.trim();
@@ -30,13 +50,15 @@ async function joinCall() {
     }
 
     try {
-        // Initialize client if not already done
-        if (!rtcClient) {
-            rtcClient = AgoraRTC.createClient({ mode: "rtc", codec: "vp8" });
-        }
+        // Cleanup any existing connection
+        await cleanup();
+
+        // Create new client
+        rtcClient = AgoraRTC.createClient({ mode: "rtc", codec: "vp8" });
 
         // Join the channel
         await rtcClient.join(window.AGORA_APP_ID, roomName, null, null);
+        isConnected = true;
         
         // Create and publish audio track
         localAudioTrack = await AgoraRTC.createMicrophoneAudioTrack();
@@ -59,29 +81,26 @@ async function joinCall() {
 
     } catch (error) {
         showMessage(`Error: ${error.message}`, true);
+        await cleanup();
+        
+        // Reset UI
+        joinForm.style.display = 'block';
+        callControls.style.display = 'none';
     }
 }
 
 // Leave the call
 async function leaveCall() {
     try {
-        if (localAudioTrack) {
-            localAudioTrack.stop();
-            localAudioTrack.close();
-        }
-        await rtcClient?.leave();
+        await cleanup();
         
         // Reset UI
         joinForm.style.display = 'block';
         callControls.style.display = 'none';
         document.getElementById('roomDisplay').textContent = '';
         document.getElementById('participantName').textContent = '';
-        showMessage('Left the room');
-
-        // Reset state
-        localAudioTrack = null;
-        isMuted = false;
         muteBtn.textContent = 'Mute';
+        showMessage('Left the room');
 
     } catch (error) {
         showMessage(`Error: ${error.message}`, true);
@@ -102,6 +121,9 @@ function toggleMute() {
 joinBtn.addEventListener('click', joinCall);
 leaveBtn.addEventListener('click', leaveCall);
 muteBtn.addEventListener('click', toggleMute);
+
+// Cleanup on page unload
+window.addEventListener('beforeunload', cleanup);
 
 // Check for App ID on load
 window.addEventListener('load', () => {
