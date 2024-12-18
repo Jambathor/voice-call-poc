@@ -89,10 +89,13 @@ async function joinCall() {
 
         // Create new client with specific configuration for static app ID
         rtcClient = AgoraRTC.createClient({
-            mode: "live",  // Changed from "rtc" to "live"
+            mode: "rtc",
             codec: "vp8",
-            role: "host"   // Added role specification
+            channelProfile: "live-broadcasting"
         });
+
+        // Set the client role
+        await rtcClient.setClientRole("host");
         
         // Setup event handlers before joining
         setupEventHandlers();
@@ -104,9 +107,9 @@ async function joinCall() {
         // Initialize volume indicator
         await initVolumeIndicator();
         
-        // Create and publish audio track with specific configuration
+        // Create and publish audio track
         localAudioTrack = await AgoraRTC.createMicrophoneAudioTrack({
-            encoderConfig: "music_standard"  // Added specific audio configuration
+            encoderConfig: "music_standard"
         });
         
         if (isMuted) {
@@ -122,7 +125,7 @@ async function joinCall() {
         showMessage('Successfully joined the room!');
 
     } catch (error) {
-        console.error('Join Error:', error);  // Added detailed error logging
+        console.error('Join Error:', error);
         showMessage(`Error: ${error.message}`, true);
         await cleanup();
         
@@ -168,13 +171,16 @@ muteBtn.addEventListener('click', toggleMute);
 // Cleanup on page unload
 window.addEventListener('beforeunload', cleanup);
 
-// Check for App ID and initialize AgoraRTC
+// Initialize AgoraRTC
 window.addEventListener('load', () => {
     if (!window.AGORA_APP_ID) {
         showMessage('Error: Agora App ID not found. Please check your deployment settings.', true);
         return;
     }
     
-    // Initialize AgoraRTC client options
-    AgoraRTC.setLogLevel(1); // Set to INFO level for better debugging
+    // Set log level for debugging
+    AgoraRTC.setLogLevel(1);
+    
+    // Enable detailed logging for debugging
+    AgoraRTC.enableLogUpload();
 }); 
